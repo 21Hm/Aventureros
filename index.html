@@ -386,8 +386,39 @@ function mapsLinks(l){
 }
 
 function fotoHTML(p){
+  if(/^drive:/.test(p.portada)){
+    var fid=p.portada.slice(6), src=PORTADAS[fid];
+    pedirPortada(fid);
+    return '<img data-drive="'+esc(fid)+'" alt=""'+(src?' src="'+src+'"':' style="opacity:0"')+' onload="this.style.opacity=1" onerror="this.remove()">'+phHTML(p,true);
+  }
   if(p.portada) return '<img src="'+esc(p.portada)+'" alt="" loading="lazy" onerror="this.remove()">'+phHTML(p,true);
   return phHTML(p,false);
+}
+
+/* Portadas privadas de Drive: se piden al API una vez y se guardan en el teléfono */
+var PORTADAS={}, colaPortadas=[], pidiendo=0, pedidas={};
+function pedirPortada(fid){
+  if(PORTADAS[fid]||pedidas[fid]) return; pedidas[fid]=1;
+  leerCache(fid).then(function(u){ if(u) ponerPortada(fid,u); else { colaPortadas.push(fid); siguientePortada(); } });
+}
+function siguientePortada(){
+  while(pidiendo<3 && colaPortadas.length){
+    var fid=colaPortadas.shift(); pidiendo++;
+    API('portada',fid).then(function(u){ guardarCache(this.f,u); ponerPortada(this.f,u); }.bind({f:fid}))
+      .catch(function(){}).then(function(){ pidiendo--; siguientePortada(); });
+  }
+}
+function ponerPortada(fid,u){
+  PORTADAS[fid]=u;
+  [].forEach.call(document.querySelectorAll('img[data-drive="'+fid+'"]'),function(img){ img.src=u; });
+}
+function leerCache(fid){
+  try{ if(!window.caches) return Promise.resolve(null);
+    return caches.open('portadas-v1').then(function(c){ return c.match('/portada/'+fid); }).then(function(r){ return r?r.text():null; }).catch(function(){ return null; });
+  }catch(e){ return Promise.resolve(null); }
+}
+function guardarCache(fid,u){
+  try{ if(window.caches) caches.open('portadas-v1').then(function(c){ return c.put('/portada/'+fid,new Response(u)); }).catch(function(){}); }catch(e){}
 }
 function phHTML(p,detras){ return '<div class="ph" style="--ph:'+FONDOS[p.categoria]+(detras?';z-index:-1':'')+'"><span>'+emojiDe(p)+'</span></div>'; }
 
