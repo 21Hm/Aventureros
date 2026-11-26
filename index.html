@@ -139,6 +139,24 @@ main{position:fixed;inset:0;padding-top:calc(var(--hdr) + env(safe-area-inset-to
 #prev{left:calc(50vw - 300px)} #next{right:calc(50vw - 300px)}
 
 /* ---------- Timeline (nichos) ---------- */
+.resumen{height:100%;overflow-y:auto;padding:0 10px calc(16px + env(safe-area-inset-bottom));display:none;--fs:13.5px}
+.resumen .cont{max-width:980px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:calc(var(--fs) * .3) 14px;align-items:start}
+.rdia{background:rgba(246,236,218,.05);border:1px solid rgba(212,163,59,.25);border-radius:10px;padding:1px 5px 2px}
+.rdia h4{margin:0;padding:1px 4px 0;font-family:'Abril Fatface',serif;font-weight:400;font-size:calc(var(--fs) + 2px);line-height:1.3;color:var(--oro);display:flex;justify-content:space-between;align-items:baseline}
+.rdia h4 small{font-family:'DM Sans';font-size:calc(var(--fs) - 2px);color:#cdb795;letter-spacing:.5px}
+.rfila{display:grid;grid-template-columns:4.9em 1.5em 1fr auto;align-items:center;gap:0 4px;width:100%;text-align:left;font-size:var(--fs);line-height:1.15;padding:calc(var(--fs) * .15) 4px;border-radius:6px;color:var(--crema)}
+.rfila + .rfila{border-top:1px dashed rgba(246,236,218,.09)}
+.rfila .h{font-weight:700;color:#e9d7b7;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rfila .e{text-align:center;font-size:.9em;line-height:1}
+.rfila .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rfila .x{font-size:calc(var(--fs) - 1.5px);white-space:nowrap;color:#e9c46a}
+.rfila .x .ok{color:#6fd39a;font-weight:700;margin-left:4px}
+.rfila .x .tbd{background:var(--cempasuchil);color:var(--noche);border-radius:4px;padding:0 4px;font-weight:700;font-size:.85em}
+.rfila.pasado{opacity:.5}
+.rfila.pasado.hecha{opacity:.8}
+.rfila.ahora{background:var(--rosa);color:#fff;opacity:1}
+.rfila.ahora .h,.rfila.ahora .x{color:#fff}
+.rfila.esvuelo .n{color:#8fd3dc}
 .timeline{height:100%;overflow-y:auto;padding:4px 14px calc(40px + env(safe-area-inset-bottom));display:none}
 .timeline .cont{max-width:560px;margin:0 auto}
 .tdia{position:sticky;top:-4px;z-index:3;margin:14px -14px 6px;padding:8px 14px;background:rgba(20,9,11,.94);backdrop-filter:blur(6px);display:flex;align-items:baseline;gap:10px}
@@ -211,6 +229,7 @@ main{position:fixed;inset:0;padding-top:calc(var(--hdr) + env(safe-area-inset-to
     <div class="seg" role="group" aria-label="Vista">
       <button id="vCarrusel" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M2 7v10M22 7v10"/></svg>Carrusel</button>
       <button id="vTimeline" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v18"/><circle cx="6" cy="7" r="2"/><circle cx="6" cy="17" r="2"/><path d="M11 7h9M11 17h9"/></svg>Timeline</button>
+      <button id="vResumen" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Resumen</button>
     </div>
   </div>
   <nav class="dias" id="dias"></nav>
@@ -219,6 +238,7 @@ main{position:fixed;inset:0;padding-top:calc(var(--hdr) + env(safe-area-inset-to
 <main id="main">
   <section class="carrusel" id="carrusel" aria-label="Actividades"></section>
   <section class="timeline" id="timeline"><div class="cont" id="tcont"></div></section>
+  <section class="resumen" id="resumen"><div class="cont" id="rcont"></div></section>
 </main>
 <button class="flechas" id="prev" aria-label="Anterior">‹</button>
 <button class="flechas" id="next" aria-label="Siguiente">›</button>
@@ -342,7 +362,7 @@ function cargar(silencioso){
 /* ---------- render ---------- */
 function render(){
   var idActual=S.actual;
-  renderDias(); medirHeader(); renderCarrusel(); renderTimeline(); aplicarVista();
+  renderDias(); medirHeader(); renderCarrusel(); renderTimeline(); renderResumen(); aplicarVista();
   $('btnYo').textContent = S.yo ? S.yo.charAt(0).toUpperCase() : '?';
   $('btnYo').style.background = S.yo ? (COLORES[S.yo]||'#7d0f22') : '';
   if(idActual) irA(idActual,false);
@@ -516,12 +536,40 @@ function renderTimeline(){
   $('tcont').innerHTML=h;
 }
 
+function renderResumen(){
+  var grupos=[], porDia={}, n=ahora();
+  S.paradas.forEach(function(p,i){ var k=diaDe(p); if(!porDia[k]){ porDia[k]={k:k,t:(p.llegada||p.inicio),items:[]}; grupos.push(porDia[k]); } porDia[k].items.push({p:p,i:i}); });
+  $('rcont').innerHTML=grupos.map(function(g){
+    var f=fDia.format(new Date(g.t-5*3600e3)).split(',');
+    var hechas=g.items.filter(function(x){return x.p.hecha;}).length;
+    return '<div class="rdia" data-rdia="'+g.k+'"><h4>'+esc(cap(f[0]))+' '+esc((f[1]||'').trim().split(' ')[0])+'<small>'+hechas+'/'+g.items.length+' ✓</small></h4>'+
+      g.items.map(function(x){
+        var p=x.p, est=estadoDe(p,x.i), prom=promedio(p.id);
+        var cls='rfila'+(est==='ahora'?' ahora':'')+(est==='pasado'?' pasado':'')+(p.hecha?' hecha':'')+(p.tipo==='vuelo'?' esvuelo':'');
+        var extra=(p.tbd?'<span class="tbd">TBD</span>':'')+(prom?' '+prom.p.toFixed(1)+'★':'')+(p.hecha?'<span class="ok">✓</span>':'');
+        return '<button class="'+cls+'" data-ir="'+p.id+'"><span class="h">'+hora(p.llegada||p.inicio)+'</span><span class="e">'+emojiDe(p)+'</span><span class="n">'+esc(p.titulo)+'</span><span class="x">'+extra+'</span></button>';
+      }).join('')+'</div>';
+  }).join('');
+  ajustarResumen();
+}
+// Achica la letra (hasta 11px) para que todo el viaje quepa en la pantalla
+function ajustarResumen(){
+  var r=$('resumen'); if(S.vista!=='resumen' || !r.clientHeight) return;
+  var fs=13.5; r.style.setProperty('--fs',fs+'px');
+  while(r.scrollHeight>r.clientHeight+1 && fs>10.5){ fs-=.25; r.style.setProperty('--fs',fs+'px'); }
+}
+
 function aplicarVista(){
-  var c=S.vista==='carrusel';
-  $('carrusel').style.display=c?'flex':'none';
-  $('timeline').style.display=c?'none':'block';
-  $('vCarrusel').setAttribute('aria-pressed',c); $('vTimeline').setAttribute('aria-pressed',!c);
-  $('prev').style.visibility=$('next').style.visibility=c?'':'hidden';
+  var v=S.vista;
+  if(v!=='carrusel' && v!=='timeline' && v!=='resumen') v=S.vista='carrusel';
+  $('carrusel').style.display=v==='carrusel'?'flex':'none';
+  $('timeline').style.display=v==='timeline'?'block':'none';
+  $('resumen').style.display=v==='resumen'?'block':'none';
+  $('vCarrusel').setAttribute('aria-pressed',v==='carrusel');
+  $('vTimeline').setAttribute('aria-pressed',v==='timeline');
+  $('vResumen').setAttribute('aria-pressed',v==='resumen');
+  $('prev').style.visibility=$('next').style.visibility=v==='carrusel'?'':'hidden';
+  if(v==='resumen') ajustarResumen();
 }
 
 /* ---------- navegación ---------- */
@@ -543,6 +591,9 @@ function irA(id, suave){
   if(S.vista==='carrusel'){
     var el=document.querySelector('.tarjeta[data-id="'+id+'"]'); if(!el) return;
     var c=$('carrusel'); c.scrollTo({left: el.offsetLeft - (c.clientWidth-el.clientWidth)/2, behavior: suave?'smooth':'auto'});
+  } else if(S.vista==='resumen'){
+    var rf=document.querySelector('.rfila[data-ir="'+id+'"]'); if(!rf) return;
+    var rr=$('resumen'); if(rr.scrollHeight>rr.clientHeight) rr.scrollTo({top: rf.offsetTop - rr.clientHeight/3, behavior: suave?'smooth':'auto'});
   } else {
     var f=document.querySelector('.fila[data-id="'+id+'"]'); if(!f) return;
     var t=$('timeline'); t.scrollTo({top: f.offsetTop - t.clientHeight/3, behavior: suave?'smooth':'auto'});
@@ -666,13 +717,14 @@ $('guardarYo').onclick=function(){ fijarNombre($('otroNombre').value || (documen
 $('guardarEdit').onclick=guardarEdicion;
 $('vCarrusel').onclick=function(){ S.vista='carrusel'; guardar('vista',S.vista); aplicarVista(); if(S.actual) irA(S.actual,false); };
 $('vTimeline').onclick=function(){ S.vista='timeline'; guardar('vista',S.vista); aplicarVista(); if(S.actual) irA(S.actual,false); };
+$('vResumen').onclick=function(){ S.vista='resumen'; guardar('vista',S.vista); aplicarVista(); if(S.actual) irA(S.actual,false); };
 $('prev').onclick=function(){ mover(-1); }; $('next').onclick=function(){ mover(1); };
 [].forEach.call(document.querySelectorAll('.velo'),function(v){ v.addEventListener('click',function(e){ if(e.target===v) cerrar(v.id); }); });
 document.addEventListener('keydown',function(e){ if(document.querySelector('.velo.abierto')) return; if(e.key==='ArrowRight') mover(1); if(e.key==='ArrowLeft') mover(-1); });
 document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && S.paradas.length) cargar(true); });
-window.addEventListener('resize',function(){ picado(); medirHeader(); });
+window.addEventListener('resize',function(){ picado(); medirHeader(); ajustarResumen(); });
 function medirHeader(){ document.documentElement.style.setProperty('--hdr', ($('hdr').offsetHeight - (parseFloat(getComputedStyle($('hdr')).paddingTop)||0)) + 'px'); }
-setInterval(function(){ if(S.paradas.length && !document.hidden){ renderTimeline(); } }, 60000);
+setInterval(function(){ if(S.paradas.length && !document.hidden){ renderTimeline(); renderResumen(); } }, 60000);
 
 /* ---------- inicio ---------- */
 if(window.__AHORA__) S.ahoraForzado=window.__AHORA__;
